@@ -72,4 +72,8 @@
 * Roboflow로의 전환 : 이러한 문제점을 해결하고 라벨링 효율성을 높이기 위해 Roboflow 플랫폼을 도입했습니다. Roboflow는 웹 기반의 강력한 라벨링 기능을 제공하며, 특히 YOLO 형식의 라벨링 데이터를 효율적으로 관리하고 내보낼 수 있는 장점이 있었습니다. 직접 크롤링한 한국 식재료 데이터셋 또한 Roboflow를 통해 라벨링 및 검수 과정을 거쳤습니다.
 * 라벨링 형식 : 모든 라벨링은 YOLO 모델 학습에 필요한 바운딩 박스(Bounding Box) 형식으로 진행되었으며, 각 이미지에 해당하는 `.txt` 파일로 저장되었습니다.
 
+![Image](https://github.com/user-attachments/assets/efde98a3-eeaf-4ba8-8b96-9570a04056bd)  
+* 설명 : 식재료 객체 인식을 위한 Labellmg 라벨링 예시
+![Image](https://github.com/user-attachments/assets/30b74ac6-e1db-46e6-a643-e8c71cd00e2d)
+* 설명 : 식재료 객체 인식을 위한 Roboflow 라벨링 예시
   
