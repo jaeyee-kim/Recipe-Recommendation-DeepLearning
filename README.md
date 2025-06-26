@@ -27,6 +27,50 @@
 ## 2. 데이터 수집 및 라벨링
 
 ### 데이터셋 구축 과정
-* 초기 계획 : 처음에는 웹 크롤링을 통해 직접 데이터를 수집하고 라벨링할 계획이었습니다.
-* 전략 변경 : 하지만 프로젝트 진행 중 시간적 제약이 발생하여, 효율적인 데이터 확보를 위해 Roboflow 플랫폼의 공개 데이터셋을 활용하는 방향으로 전략을 변경하였습니다.
-* 데이터 규모 : Roboflow를 통해 총 42,978개의 다양한 식재료 이미지를 수집하여 데이터셋을 구축했습니다. 이 데이터셋은 YOLO 모델 학습에 적합하도록 이미 라벨링이 완료된 상태였습니다.
+본 프로젝트의 핵심인 식재료 인식 모델 학습을 위해 고품질의 식재료 이미지 데이터셋을 구축하였습니다.
+초기에는 직접 웹 크롤링을 통해 데이터를 수집하고 LabelImg를 사용하여 라벨링을 진행할 계획이었습니다. 하지만 LabelImg 사용 중 클래스명 꼬임 현상과 같은 이슈가 발생하여, 효율적인 데이터 확보와 라벨링 품질 유지를 위해 Roboflow 플랫폼으로 전환하여 공개 데이터셋을 활용하고, 직접 크롤링한 한국 식재료 데이터셋도 Roboflow를 통해 관리하는 방향으로 전략을 변경하였습니다.
+
+#### 2.1. Roboflow 공개 데이터셋 활용
+주로 다양한 채소와 과일 이미지를 포함하고 있는 Roboflow Universe의 공개 데이터셋을 활용하였습니다.
+* 출처 : Combined Vegetables & Fruits Object Detection Dataset by Yolo
+* 구성 : Train : 34,008개 이미지
+         Validation : 4,619개 이미지
+         Test : 3,358개 이미지
+         총계 : 41,985개 이미지
+
+#### 2.2. 직접 크롤링한 한국 식재료 데이터셋
+한국 요리에 자주 사용되는 식재료의 다양성을 확보하기 위해 직접 웹 크롤링을 통해 이미지를 수집하고 라벨링하여 데이터셋을 보강하였습니다.
+* 출처 : 웹 크롤링을 통해 직접 수집 및 라벨링 (My First Project Object Detection Dataset by kim)
+* 구성 : Train: 635개 이미지
+         Validation: 151개 이미지
+         Test: 993개 이미지
+         총계 : 1,779개 이미지
+
+#### 2.3. 최종 통합 데이터셋
+위 두 데이터셋을 통합하여 최종 학습에 사용된 데이터셋의 규모는 다음과 같습니다.
+* Train: 34,643개 이미지 (34,008 + 635)
+* Validation: 4,770개 이미지 (4,619 + 151)
+* Test: 3,565개 이미지 (3,358 + 993)
+* 전체 총계 : 42,978개 이미지
+
+### 라벨링 클래스
+본 프로젝트에서는 총 50가지의 다양한 식재료 클래스를 인식하도록 모델을 학습시켰습니다. 학습에 사용된 식재료 클래스는 다음과 같습니다: 
+``` 
+'almond', 'apple', 'asparagus', 'avocado', 'banana', 'beans', 'beet', 'bell pepper',
+'blackberry', 'blueberry', 'broccoli', 'brussels sprouts', 'cabbage', 'carrot',
+'cauliflower', 'celery', 'cherry', 'corn', 'cucumber', 'egg', 'eggplant', 'garlic',
+'grape', 'green bean', 'green onion', 'hot pepper', 'kiwi', 'lemon', 'lettuce', 'lime',
+'mandarin', 'mushroom', 'onion', 'orange', 'pattypan squash', 'pea', 'peach', 'pear',
+'pineapple', 'potato', 'pumpkin', 'radish', 'raspberry', 'strawberry', 'tomato',
+'vegetable marrow', 'watermelon', 'kimchi', 'seaweed', 'tobu' 
+```
+
+### 라벨링 툴 및 과정
+데이터 라벨링은 객체 탐지 모델 학습의 핵심 단계로, 정확하고 일관된 라벨링이 모델 성능에 큰 영향을 미칩니다.
+
+* LabelImg 시도 및 한계 : 프로젝트 초기에는 오프라인 라벨링 툴인 LabelImg를 사용하여 직접 수집한 이미지에 대한 라벨링을 시도했습니다. 하지만 대규모 데이터셋 관리 및 클래스명 일관성 유지 과정에서 클래스명 꼬임, 버전 관리의 어려움 등 여러 이슈에 직면했습니다.
+* Roboflow로의 전환 : 이러한 문제점을 해결하고 라벨링 효율성을 높이기 위해 Roboflow 플랫폼을 도입했습니다. Roboflow는 웹 기반의 강력한 라벨링 기능을 제공하며, 특히 YOLO 형식의 라벨링 데이터를 효율적으로 관리하고 내보낼 수 있는 장점이 있었습니다. 직접 크롤링한 한국 식재료 데이터셋 또한 Roboflow를 통해 라벨링 및 검수 과정을 거쳤습니다.
+* 라벨링 형식 : 모든 라벨링은 YOLO 모델 학습에 필요한 바운딩 박스(Bounding Box) 형식으로 진행되었으며, 각 이미지에 해당하는 `.txt` 파일로 저장되었습니다.
+
+  
+
