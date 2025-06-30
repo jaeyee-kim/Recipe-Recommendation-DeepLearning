@@ -74,9 +74,9 @@
 * 라벨링 형식 : 모든 라벨링은 YOLO 모델 학습에 필요한 바운딩 박스(Bounding Box) 형식으로 진행되었으며, 각 이미지에 해당하는 `.txt` 파일로 저장되었습니다.
 
 ![Image](https://github.com/user-attachments/assets/efde98a3-eeaf-4ba8-8b96-9570a04056bd)  
-* 설명 : 식재료 객체 인식을 위한 Labellmg Labeling 예시
+* 설명 : Labellmg Labeling 예시
 ![Image](https://github.com/user-attachments/assets/30b74ac6-e1db-46e6-a643-e8c71cd00e2d)
-* 설명 : 식재료 객체 인식을 위한 Roboflow Labeling 예시
+* 설명 : Roboflow Labeling 예시
 
 
   
@@ -90,12 +90,12 @@
 
 #### 3.1.1. 학습 환경 및 설정
 
-*   **모델 버전:** YOLOv5 (Ultralytics 공식 GitHub 저장소 활용)
-*   **학습 데이터:** [2.3. 최종 통합 데이터셋](#23-최종-통합-데이터셋)에서 구축한 42,978개의 식재료 이미지 데이터셋
-*   **환경:** Python, PyTorch
-*   **사용된 스크립트:** `train.py`
+* 모델 버전: YOLOv5 (Ultralytics 공식 GitHub 저장소 활용)
+* 학습 데이터: [2.3. 최종 통합 데이터셋](#23-최종-통합-데이터셋)에서 구축한 42,978개의 식재료 이미지 데이터셋
+* 환경: Python, PyTorch
+* 사용된 스크립트: train.py
 
-**`train.py` 코드 스니펫:**
+train.py 코드 스니펫:
 
 ```python
 import os
@@ -103,7 +103,7 @@ import os
 # YOLOv5 설치 및 학습
 # os.system('pip install -qr https://github.com/ultralytics/yolov5/releases/latest/download/requirements.txt')
 os.system('python yolov5/train.py --img 640 --batch 16 --epochs 50 --data data.yaml --weights yolov5s.pt --project runs/train --name exp')
-
+```
 주요 학습 파라미터 설명:
 * img 640: 학습 시 이미지 크기를 640x640 픽셀로 설정합니다.
 * batch 16: 한 번에 처리할 이미지의 개수(배치 크기)를 16으로 설정합니다.
@@ -125,7 +125,7 @@ import os
 # test 이미지 폴더에 대해 추론 수행
 os.system('python yolov5/detect.py --weights runs/train/exp/weights/best.pt --img 640 --conf 0.25 --source yolov5/data_jy/test --save-txt --save-conf --project runs/food_ingredients --exist-ok True')
 os.system('python yolov5/val.py --weights runs/train/exp/weights/best.pt --data data.yaml --img 640')
-
+```
 주요 추론 및 검증 파라미터 설명:
 * weights runs/train/exp/weights/best.pt: 학습을 통해 얻은 최적의 가중치 파일(best.pt)을 사용합니다.
 * img 640: 추론 시 이미지 크기를 640x640 픽셀로 설정합니다.
@@ -161,7 +161,7 @@ roboflow:
   version: 8
   license: CC BY 4.0
   url: https://universe.roboflow.com/yolo-jpkho/combined-vegetables-fruits/dataset/8
-
+```
 이 설정 파일을 통해 YOLOv5 모델이 학습 과정에서 올바른 데이터셋과 클래스 정보를 참조할 수 있도록 했습니다. 특히 Roboflow에서 제공하는 'Combined Vegetables & Fruits' 데이터셋(버전 8)을 기반으로 하여, 총 50개의 식재료 클래스에 대한 객체 탐지 모델을 학습시켰습니다.
 
 
@@ -180,7 +180,7 @@ from ultralytics import YOLO
 
 model = YOLO('yolov8l.yaml') # yolov8l 모델 구조 로드
 model.train(data='/mnt/d/jypark/yolov8_test/data.yaml', epochs=50, imgsz=640, batch=16)
-
+```
 주요 학습 파라미터 설명:
 * model = YOLO('yolov8l.yaml'): YOLOv8 모델 중 yolov8l (large) 버전을 사용하여 모델을 초기화합니다. 이는 더 큰 모델로, 복잡한 패턴 학습에 유리합니다.
 * data='/mnt/d/jypark/yolov8_test/data.yaml': 학습에 사용할 데이터셋의 data.yaml 파일 경로를 지정합니다.
@@ -197,7 +197,7 @@ from ultralytics import YOLO
 model = YOLO('runs/detect/train/weights/best.pt') # 학습된 모델 가중치 로드
 model.predict(source='/mnt/d/jypark/yolov8_test/data/test/images', conf=0.25, save=True, save_txt=True, save_conf=True, project='runs/detect', name='test', exist_ok=True)
 model.val(data='data.yaml', split='test', save_json=True, save_txt=True, save_dir='runs/detect/val')
-
+```
 주요 추론 및 검증 파라미터 설명:
 * model = YOLO('runs/detect/train/weights/best.pt'): 학습이 완료된 모델의 best.pt 가중치 파일을 로드하여 추론 및 검증에 사용합니다.
 * source='/mnt/d/jypark/yolov8_test/data/test/images': 추론을 수행할 이미지의 경로를 지정합니다.
@@ -241,7 +241,7 @@ film['val'] = '/content/drive/MyDrive/my_ws/Object_Detection/food_dataset2/test/
 
 with open(data_yaml, 'w') as f:
     yaml.dump(film, f, default_flow_style=False)
-
+```
 주요 환경 설정 및 경로 변경 설명:
 * !pip install ultralytics: 필요한 라이브러리를 설치합니다.
 * drive.mount('/content/drive'): Google Colab 환경에서 Google Drive를 마운트하여 데이터셋 및 모델에 접근할 수 있도록 합니다.
@@ -257,7 +257,7 @@ from ultralytics import YOLO
 
 model = YOLO('yolov8n.yaml')  # yolov8n 모델 구조 선택
 model.train(data='/content/drive/MyDrive/my_ws/Object_Detection/food_dataset2/data.yaml', epochs=50, imgsz=640, batch=16)
-
+```
 주요 학습 파라미터 설명:
 * model = YOLO('yolov8n.yaml'): YOLOv8 모델 중 yolov8n (nano) 버전을 사용하여 모델을 초기화합니다. yolov8n은 yolov8l보다 작고 빠르며, 경량 모델 구축 및 빠른 실험에 적합합니다.
 * data='...': 동적으로 설정된 data.yaml 파일을 사용하여 학습 데이터셋을 지정합니다.
@@ -280,7 +280,7 @@ if weight_paths:
     print(f"✅ best.pt 저장 완료 → {save_path}")
 else:
     print("❌ best.pt를 찾지 못했습니다.")
-
+```
 주요 가중치 저장 설명:
 * glob.glob(...): Colab 환경에서 학습 완료 후 생성된 best.pt 가중치 파일의 경로를 찾습니다. train*/weights/best.pt 패턴을 사용하여 가장 최근 학습된 모델의 가중치를 식별합니다.
 * best_weight_path = weight_paths[-1]: 여러 학습 세션이 있을 경우, 가장 최근에 생성된 best.pt 파일을 선택합니다.
