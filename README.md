@@ -285,3 +285,159 @@ else:
 * glob.glob(...): Colab 환경에서 학습 완료 후 생성된 best.pt 가중치 파일의 경로를 찾습니다. train*/weights/best.pt 패턴을 사용하여 가장 최근 학습된 모델의 가중치를 식별합니다.
 * best_weight_path = weight_paths[-1]: 여러 학습 세션이 있을 경우, 가장 최근에 생성된 best.pt 파일을 선택합니다.
 * save_path = '/content/drive/MyDrive/my_ws/food_best.pt': 찾은 best.pt 파일을 Google Drive의 지정된 경로로 복사하여 영구적으로 저장합니다. 이는 Colab 세션 종료 후에도 학습된 모델을 보존하고 재활용하기 위함입니다.
+
+## 4. LLM 모델 적용
+
+본 프로젝트는 식재료 객체 인식 모델에서 한 단계 더 나아가, 인식된 식재료를 기반으로 맞춤형 레시피를 제안하기 위해 **거대 언어 모델(Large Language Model, LLM)**을 통합하였습니다. 이를 통해 사용자는 냉장고 속 재료만으로도 다양한 요리 아이디어를 얻고, 음식물 낭비를 줄이는 데 도움을 받을 수 있습니다.
+
+### 4.1. LLM 모델 선정 및 핵심 모듈 구현
+
+레시피 추천 기능을 구현하기 위해 **Microsoft Phi-1.5** 모델을 선정하여 활용했습니다. Phi-1.5는 Microsoft에서 개발한 13억 개의 파라미터를 가진 트랜스포머 기반의 경량 언어 모델로, 복잡한 추론 작업에 강점을 보이며 고품질의 합성 데이터셋으로 학습되어 특정 도메인 작업에 효율적으로 활용될 수 있습니다.
+
+LLM과의 상호작용을 체계적으로 관리하고 재사용성을 높이기 위해 `RecipeRecommender` 클래스를 별도의 핵심 모듈로 구현했습니다. 이 클래스는 LLM 모델 로드, 동적 프롬프트 생성, 레시피 추천 기능을 캡슐화합니다.
+
+RecipeRecommender 클래스 코드 스니펫:
+
+```python
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
+
+class RecipeRecommender:
+    def __init__(self, model_name="microsoft/phi-1_5", device=None):
+        # 모델 로드 및 디바이스 설정 (GPU 사용 가능 시 CUDA, 아니면 CPU)
+        self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.model = AutoModelForCausalLM.from_pretrained(model_name).to(self.device)
+
+    def build_prompt(self, ingredients):
+        # 식재료 목록을 기반으로 LLM 프롬프트 생성
+        ingredients_str = ", ".join(ingredients)
+        prompt = (
+                  "You are a recipe recommendation AI. Given the following ingredients, suggest a simple recipe.\n\n"
+                  "Ingredients: {ingredients_str}\n\n" # <-- 이 부분은 f-string을 위해 {ingredients_str}로 수정
+                  "Format:\n- Dish name:\n- Ingredients:\n- Steps:\n\n"
+                  "Answer:"
+        )
+        return prompt.strip()
+
+    def recommend_recipe(self, ingredients, max_tokens=250):
+        # 생성된 프롬프트를 LLM에 전달하여 레시피 추천
+        prompt = self.build_prompt(ingredients)
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
+
+        output = self.model.generate(
+            **inputs,
+            max_new_tokens=max_tokens,
+            do_sample=True,
+            temperature=0.7, # 생성의 무작위성 조절
+            top_p=0.9,       # 상위 확률 분포에서 샘플링
+            pad_token_id=self.tokenizer.eos_token_id
+        )
+
+        result = self.tokenizer.decode(output[0], skip_special_tokens=True)
+        response = result.replace(prompt, "").strip() # 프롬프트 부분 제거
+        return response
+```
+주요 특징 및 역할:
+* 모듈화: LLM 관련 로직을 RecipeRecommender 클래스 내부에 캡슐화하여 코드의 재사용성과 유지보수성을 높였습니다.
+* 디바이스 최적화: GPU(CUDA) 사용 가능 여부를 자동으로 감지하여 모델을 최적의 하드웨어에 로드하도록 설정했습니다.
+* 동적 프롬프트 생성: 사용자가 입력한 식재료에 따라 레시피 요청 프롬프트를 동적으로 구성하여 LLM에 전달합니다.
+* 레시피 생성 파라미터 제어: max_new_tokens, temperature, top_p 등의 파라미터를 조절하여 LLM의 레시피 생성 방식(길이, 다양성, 일관성)을 제어할 수 있습니다.
+
+### 4.2. Streamlit 기반 웹 애플리케이션 통합
+구현된 RecipeRecommender 핵심 모듈을 활용하여 사용자 친화적인 웹 애플리케이션을 구축했습니다. Streamlit 프레임워크를 사용하여 직관적인 UI를 제공하며, YOLOv5 식재료 인식 모델과 LLM 레시피 추천 모듈을 통합하여 최종 서비스를 구현했습니다.
+
+통합 아키텍처:
+* 이미지 입력: 사용자가 Streamlit 웹 UI를 통해 식재료 사진을 업로드합니다.
+* YOLOv5 객체 인식: load_yolo_model 함수를 통해 로드된 YOLOv5 모델이 사진 속 식재료를 탐지하고 목록을 추출합니다.
+* LLM 모듈 호출: 추출된 식재료 목록은 RecipeRecommender 클래스의 recommend_recipe 메서드에 전달됩니다.
+* LLM 레시피 생성: RecipeRecommender 내부에서 Phi-1.5 모델이 레시피를 생성합니다.
+* 레시피 출력: 생성된 레시피는 Streamlit 웹 페이지에 사용자에게 보기 좋은 형태로 제공됩니다.
+
+Streamlit 웹 애플리케이션 핵심 코드 스니펫:
+
+```python
+
+import streamlit as st
+import torch
+from PIL import Image
+from transformers import AutoTokenizer, AutoModelForCausalLM
+
+# 1. 모델 로드 (YOLO 및 LLM) - @st.cache_resource를 통해 모델 로딩 최적화
+@st.cache_resource
+def load_yolo_model():
+    model = torch.hub.load('ultralytics/yolov5', 'custom', path='./best.pt', force_reload=True)
+    return model
+
+@st.cache_resource
+def load_llm_model():
+    model_name = "microsoft/phi-1_5"
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(model_name)
+    return tokenizer, model
+
+yolo_model = load_yolo_model()
+tokenizer, llm_model = load_llm_model()
+
+# 2. Streamlit UI 및 레시피 추천 로직
+st.title("🍳 사진 기반 레시피 추천기")
+uploaded_file = st.file_uploader("Upload food image:", type=["jpg", "jpeg", "png"])
+
+if uploaded_file is not None:
+    image = Image.open(uploaded_file)
+    st.image(image, caption="Uploaded Image", use_container_width=True)
+
+    with st.spinner("Detecting Ingredients..."):
+        results = yolo_model(image)
+        labels = results.names
+        detected = results.pred[0][:, -1].cpu().numpy()
+        ingredients = list(set([labels[int(i)] for i in detected]))
+
+    if ingredients:
+        st.success(f"Detected Ingredients: {', '.join(ingredients)}")
+
+        # LLM에게 전달할 프롬프트 구성 (RecipeRecommender 클래스의 build_prompt 로직과 유사)
+        prompt = (
+                  f"You are a recipe recommendation AI. Given the following ingredients, suggest a simple recipe.\n\n"
+                  f"Ingredients: {', '.join(ingredients)}. \n\n"
+                  f"Format:\n- Dish name:\n- Ingredients:\n- Steps:\n\n"
+                  f"Answer:"
+        )
+
+        with st.spinner("Creating Recipe..."):
+            inputs = tokenizer(prompt, return_tensors="pt")
+            outputs = llm_model.generate(
+                **inputs,
+                max_new_tokens=300,
+                do_sample=True,
+                top_p=0.95,
+                temperature=0.8,
+                pad_token_id=tokenizer.eos_token_id
+            )
+            generated_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+            cleaned_output = generated_text.replace(prompt, "").strip()
+
+        st.markdown("🍳 **Recommended Recipe:**")
+        st.markdown(cleaned_output)
+    else:
+        st.warning("The ingredient was not recognized. Please try another image.")
+```
+Streamlit 웹 애플리케이션 코드 설명:
+* 모델 로딩 최적화: `@st.cache_resource` 데코레이터를 사용하여 YOLO 및 LLM 모델을 한 번만 로드하도록 최적화했습니다. 이는 Streamlit 앱의 성능을 크게 향상시키는 중요한 기법입니다.
+* 사용자 인터페이스 구성:`st.title()`, `st.file_uploader()` 등의 Streamlit 컴포넌트를 활용하여 직관적인 사용자 인터페이스를 구성했습니다. 특히 이미지 업로드 기능은 사용자가 식재료 사진을 쉽게 제공할 수 있도록 합니다.
+* 실시간 피드백: `st.spinner()`, `st.success()`, `st.warning()` 등을 통해 사용자에게 처리 과정과 결과를 실시간으로 알려주어 사용자 경험을 향상시켰습니다.
+* YOLO-LLM 파이프라인 구현:
+  1. YOLO 모델로 이미지에서 식재료를 탐지
+  2. 탐지된 식재료 목록을 추출
+  3. LLM 프롬프트에 동적으로 삽입
+  4. LLM이 맞춤형 레시피를 생성하는 전체 파이프라인을 구현
+* 중복 제거 로직: `list(set([...]))` 구문을 통해 동일한 식재료가 여러 번 탐지되더라도 중복 없이 한 번만 레시피에 반영되도록 처리했습니다.
+* LLM 생성 파라미터 최적화: `temperature=0.8`, `top_p=0.95` 등의 파라미터를 조정하여 레시피 생성의 창의성과 일관성 사이의 균형을 맞추었습니다.
+* 결과 후처리:`cleaned_output = generated_text.replace(prompt, "").strip()` 코드를 통해 LLM이 생성한 텍스트에서 프롬프트 부분을 제거하고 실제 레시피만 깔끔하게 추출하여 사용자에게 제공합니다.
+
+### 4.3. LLM 적용을 통한 성과 및 인사이트
+동적 레시피 생성: 고정된 데이터베이스의 레시피를 제공하는 대신, 사용자의 입력(식재료 사진)에 따라 LLM이 실시간으로 새로운 레시피를 생성함으로써 추천의 유연성과 다양성을 확보했습니다.
+사용자 경험 향상: 직관적인 웹 인터페이스를 통해 딥러닝 모델의 복잡한 기능을 일반 사용자도 쉽게 활용할 수 있도록 구현하여, 접근성과 편의성을 높였습니다.
+모듈화된 시스템 설계: RecipeRecommender 클래스와 Streamlit 웹 UI를 분리하여, 각 컴포넌트의 역할과 책임을 명확히 하고 시스템의 확장성 및 유지보수성을 고려한 설계를 적용했습니다.
+AI 모델 통합 역량: 객체 탐지 모델(YOLOv5)과 언어 모델(Phi-1.5)이라는 두 가지 이종의 AI 모델을 하나의 애플리케이션으로 성공적으로 통합하여, 복합적인 AI 시스템을 설계하고 구현하는 역량을 보여주었습니다.
+도메인 특화 프롬프트 엔지니어링: 'Dish name', 'Ingredients', 'Steps'와 같은 특정 형식을 지정하는 프롬프트 엔지니어링을 통해 LLM이 원하는 형식의 레시피를 생성하도록 유도했습니다.
